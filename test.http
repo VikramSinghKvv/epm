@@ -1,0 +1,460 @@
+### 1. Get All Products
+
+GET http://localhost:4004/AdminService/Products
+
+###
+http://localhost:4004/purchasing/$metadata
+
+###
+http://localhost:4004/purchasing/$metadata
+
+###
+GET http://localhost:4004/purchasing/PurchaseOrders
+###
+GET http://localhost:4004/purchasing/PurchaseOrders?$expand=supplier,items
+
+### 2. Expand Supplier Details
+
+GET http://localhost:4004/AdminService/Products?$expand=supplier
+
+### 3. Expand Category Details
+
+GET http://localhost:4004/AdminService/Products?$expand=category
+
+
+### 4. Filter Products by Price
+
+GET http://localhost:4004/AdminService/Products?$filter=price gt 5000
+
+### 5. Filter Products with Low Stock
+
+GET http://localhost:4004/AdminService/Products?$filter=stock le minStock
+
+### 6. Sort Products by Price Descending
+
+GET http://localhost:4004/AdminService/Products?$orderby=price desc
+
+### 7. Sort Customers by Name
+
+GET http://localhost:4004/AdminService/Customers?$orderby=name asc
+
+
+
+
+### 8. Get Purchase Orders with Supplier
+
+GET http://localhost:4004/AdminService/PurchaseOrders?$expand=supplier
+
+
+@sales = http://localhost:4004/sales
+
+### Test 1: Create order without customer (should fail)
+POST {{sales}}/SalesOrders
+Content-Type: application/json
+
+{
+  "orderDate": "2026-06-15",
+  "items": [
+    { "product_ID": "p1000001-...", "quantity": 2, "unitPrice": 50.00 }
+  ]
+}
+
+### Test 2: Create order with past date (should fail)
+POST {{sales}}/SalesOrders
+Content-Type: application/json
+
+{
+  "customer_ID": "c1000001-...",
+  "orderDate": "2020-01-01",
+  "items": [
+    { "product_ID": "p1000001-...", "quantity": 2, "unitPrice": 50.00 }
+  ]
+}
+
+### Test 3: Create order with invalid item (quantity 0)
+POST {{sales}}/SalesOrders
+Content-Type: application/json
+
+{
+  "customer_ID": "c1000001-...",
+  "orderDate": "2026-06-15",
+  "items": [
+    { "product_ID": "p1000001-...", "quantity": 0, "unitPrice": 50.00 }
+  ]
+}
+
+### Test 4: Create valid order (should succeed + auto-calculate totals!)
+POST {{sales}}/SalesOrders
+Content-Type: application/json
+
+{
+  "customer_ID": "c1000001-...",
+  "orderNumber": "SO-201",
+  "orderDate": "2026-06-15",
+  "currency_code": "USD",
+  "items": [
+    { "product_ID": "p1000001-...", "quantity": 2, "unitPrice": 499.99 },
+    { "product_ID": "p1000002-...", "quantity": 1, "unitPrice": 29.99 }
+  ]
+}
+
+### Test 5: Try invalid status transition (New → Delivered should fail)
+PATCH {{sales}}/SalesOrders(ORDER-ID-FROM-TEST-4)
+Content-Type: application/json
+
+{
+  "status": "Delivered"
+}
+
+### Test 6: Valid status transition (New → Confirmed)
+PATCH {{sales}}/SalesOrders(ORDER-ID-FROM-TEST-4)
+Content-Type: application/json
+
+{
+  "status": "Confirmed"
+}
+
+
+
+### Call unbound action: GenerateReport
+POST http://localhost:4004/analytics/GenerateReport
+Content-Type: application/json
+
+{
+  "reportType": "Sales",
+  "startDate": "2026-01-01",
+  "endDate": "2026-05-31"
+}
+###
+POST http://localhost:4004/analytics/PingHealth
+
+
+
+@base = http://localhost:4004/orders
+
+### ═══════════════════════════════════════
+### SETUP: Create test data
+### ═══════════════════════════════════════
+
+### Create a customer
+POST {{base}}/Customers
+Content-Type: application/json
+
+{
+  "name": "Test",
+  "email": "test1@example.com",
+  "city": "gkp",
+  "creditLimit": 600000
+}
+
+###
+POST {{base}}/Orders
+Content-Type: application/json
+
+{
+  "orderNumber": "SO1009",
+  "customer_ID": "38995732-7451-4107-937b-35b481b27f49",
+  "orderDate": "2026-06-02",
+  "amount": 1500.00,
+  "status": "New",
+
+  "items": [
+    {
+      "product_ID": "11111111-1111-1111-1111-111111111111",
+      "quantity": 2,
+      "unitPrice": 500.00
+    },
+    {
+      "product_ID": "22222222-2222-2222-2222-222222222222",
+      "quantity": 1,
+      "unitPrice": 500.00
+    }
+  ]
+}
+
+### Create an order (use customer ID from above)
+POST {{base}}/Orders
+Content-Type: application/json
+
+{
+  "orderNumber": "SO1009",
+  "customer_ID": "38995732-7451-4107-937b-35b481b27f49",
+  "orderDate": "2026-06-02",
+  "amount": 1500.00,
+  "status": "New"
+
+}
+
+
+### ═══════════════════════════════════════
+### BOUND ACTIONS (on specific orders)
+### ═══════════════════════════════════════
+
+### Confirm the order
+POST {{base}}/Orders(1943cd8f-e654-443b-bd19-45ce49e04b72)/OrderService.confirm
+Content-Type: application/json
+
+{}
+
+### Try to confirm again (should fail — already confirmed)
+POST {{base}}/Orders(87944122-9f8c-4151-b48c-91f486d0928a)/OrderService.confirm
+Content-Type: application/json
+
+{}
+
+### Ship the order
+POST {{base}}/Orders(93eab19d-cffb-41c4-9e04-a48031f8f93b)/OrderService.ship
+Content-Type: application/json
+
+{
+  "trackingNumber": "TRK-2026-001",
+  "carrier": "BlueDart"
+}
+
+### Deliver the order
+POST {{base}}/Orders(87944122-9f8c-4151-b48c-91f486d0928a)/OrderService.deliver
+Content-Type: application/json
+
+{}
+### TESTED THAT IS IT UPADTIRNG OR NOT BY GETTING THE ORDER DETAILS
+GET {{base}}/Orders(87944122-9f8c-4151-b48c-91f486d0928a)
+
+### Try to cancel a delivered order (should fail)
+POST {{base}}/Orders(93eab19d-cffb-41c4-9e04-a48031f8f93b)/OrderService.cancel
+Content-Type: application/json
+
+{
+  "reason": "Changed my mind"
+}
+
+
+### ═══════════════════════════════════════
+### BOUND FUNCTIONS (read-only, on specific orders)
+### ═══════════════════════════════════════
+
+### Get order total (calculated)
+GET {{base}}/Orders(6ba28d08-d890-4044-9e55-f9164b565219)/OrderService.getTotal()
+
+
+### ═══════════════════════════════════════
+### UNBOUND ACTIONS (service-level)
+### ═══════════════════════════════════════
+
+### Bulk confirm multiple orders
+POST {{base}}/bulkConfirm
+Content-Type: application/json
+
+{
+  "orderIds": ["order-uuid-1", "order-uuid-2", "order-uuid-3"]
+}
+
+
+### ═══════════════════════════════════════
+### UNBOUND FUNCTIONS (service-level, GET request!)
+### ═══════════════════════════════════════
+
+### Get order statistics for June 2026
+GET {{base}}/getOrderStats(year=2026,month=6)
+
+### Get top 3 customers by spending causing error 500 Internal Server Error due to missing implementation of the function in the service layer. This needs to be implemented to return the top customers based on their total spending.
+GET {{base}}/getTopCustomers(limit=3)
+
+
+
+
+
+@temp = http://localhost:4004/purchasing
+
+### ═══════════════════════════════════════════════
+### STEP 1: View Dashboard (unbound function)
+### ═══════════════════════════════════════════════
+GET {{temp}}/getPurchasingDashboard()
+
+
+### ═══════════════════════════════════════════════
+### STEP 2: Create a Purchase Order (standard CRUD)
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrders
+Content-Type: application/json
+
+{
+ 
+      "poNumber": "PO1001",
+      "supplier_ID": "11111111-1111-1111-1111-111111111111",
+      "orderDate": "2026-05-01",
+      "amount": 98765,
+      "currency_code": "INR",
+      "status": "Draft",
+      "items": [
+        {
+          "product_ID": "p1",
+          "quantity": 100,
+          "unitPrice": 45.00
+        },
+        {
+          "product_ID": "p2",
+          "quantity": 50,
+          "unitPrice": 30.00
+        }
+      ]
+
+
+}
+###
+GET {{temp}}/PurchaseOrders(0affd221-1fdf-4e62-ab54-4fdc9e631874)
+
+
+### ═══════════════════════════════════════════════
+### STEP 3: Add items to PO (standard CRUD) //try later with batch create for multiple items
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrderItems
+Content-Type: application/json
+
+{
+  "purchaseOrder_ID": "37bc17d1-0314-40ce-a1ba-3fd4375ef4b7",
+  "product_ID": "p1",
+  "quantity": 100,
+  "unitPrice": 45.00,
+  "currency_code": "USD"
+}
+
+
+### ═══════════════════════════════════════════════
+### STEP 4: Get PO Summary (bound function)
+### ═══════════════════════════════════════════════
+GET {{temp}}/PurchaseOrders(38477485-1cee-422f-a76e-77b69a4267ad)/PurchasingService.getSummary()
+
+
+### ═══════════════════════════════════════════════
+### STEP 5: Try to submit without items (should fail if no items)
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrders(38477485-1cee-422f-a76e-77b69a4267ad)/PurchasingService.submit
+Content-Type: application/json
+
+{}
+
+###
+GET {{temp}}/PurchaseOrders
+### ═══════════════════════════════════════════════
+### STEP 6: Submit PO for approval (bound action)
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrders(c8aee83a-a702-46e0-a2a5-6731b8aec8b8)/PurchasingService.submit
+Content-Type: application/json
+
+{}
+
+
+### ═══════════════════════════════════════════════
+### STEP 7: Try to submit again (should fail — not Draft)
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrders(c8aee83a-a702-46e0-a2a5-6731b8aec8b8)/PurchasingService.submit
+Content-Type: application/json
+
+{}
+
+
+### ═══════════════════════════════════════════════
+### STEP 8: Approve the PO (bound action)
+### ═══════════════════════════════════════════════
+POST {{base}}/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/PurchasingService.approve
+Content-Type: application/json
+
+{
+  "comment": "Approved. Budget available for Q2 restock."
+}
+
+
+### ═══════════════════════════════════════════════
+### STEP 9: Receive goods (bound action — also updates stock!)
+### ═══════════════════════════════════════════════
+POST {{temp}}/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/PurchasingService.receive
+Content-Type: application/json
+
+{
+  "notes": "All items received in good condition"
+}
+
+
+### ═══════════════════════════════════════════════
+### STEP 10: Verify stock was updated
+### ═══════════════════════════════════════════════
+GET {{base}}/Products(p8)?$select=productName,stock
+
+
+### ═══════════════════════════════════════════════
+### BONUS: Test rejection workflow
+### ═══════════════════════════════════════════════
+
+### Create another PO and submit it
+POST {{base}}/PurchaseOrders
+Content-Type: application/json
+
+{
+  "poNumber": "PO-2026-002",
+  "supplier_ID": "PASTE-SUPPLIER-ID",
+  "orderDate": "2026-06-02",
+  "status": "Draft",
+  "currency_code": "USD"
+}
+
+### (add items, then submit...)
+
+### Reject without reason (should fail)
+POST {{base}}/PurchaseOrders(PO-2-ID)/PurchasingService.reject
+Content-Type: application/json
+
+{}
+
+### Reject with reason
+POST {{base}}/PurchaseOrders(PO-2-ID)/PurchasingService.reject
+Content-Type: application/json
+
+{
+  "reason": "Budget exceeded for this quarter. Please reduce quantities and resubmit."
+}
+
+
+### ═══════════════════════════════════════════════
+### Check dashboard after all operations
+### ═══════════════════════════════════════════════
+GET {{base}}/getPurchasingDashboard()
+
+
+###
+http://localhost:4004/purchasing/$metadata
+
+###
+POST http://localhost:4004/purchasing/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/approve
+Content-Type: application/json
+
+{
+  "comment": "Approved"
+}
+
+###
+GET http://localhost:4004/purchasing/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)
+
+###
+POST http://localhost:4004/purchasing/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/submit
+Content-Type: application/json
+
+
+###
+POST http://localhost:4004/purchasing/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/approve
+Content-Type: application/json
+
+{
+  "comment": "Approved"
+}
+
+###
+POST http://localhost:4004/purchasing/PurchaseOrders(7a5a2cda-07eb-4d31-8ff0-b0253f8868ed)/receive
+Content-Type: application/json
+
+{
+  "receivedQty": 10,
+  "notes": "Goods received in good condition"
+}
+
+###
+GET http://localhost:4004/purchasing/$metadata
