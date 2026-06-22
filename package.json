@@ -2,7 +2,11 @@
   "name": "epm-complete",
   "version": "1.0.0",
   "dependencies": {
-    "@sap/cds": "^9.9.1"
+    "@cap-js/hana": "^2",
+    "@sap/cds": "^9.9.1",
+    "@sap/hdi-deploy": "^4",
+    "@sap/xssec": "^4",
+    "hdb": "^0.19"
   },
   "devDependencies": {
     "@cap-js/sqlite": "^2.4",
@@ -18,9 +22,50 @@
   "cds": {
     "requires": {
       "db": {
-        "kind": "sqlite",
-        "credentials": {
-          "url": "db/epm.db"
+        "kind": "hana-cloud",
+        "[development]": {
+          "kind": "sql"
+        },
+        "[production]": {
+          "kind": "hana-cloud"
+        }
+      },
+      "auth": {
+        "kind": "xsuaa",
+        "[development]": {
+          "kind": "mocked",
+          "users": {
+            "alice": {
+              "password": "alice",
+              "roles": [
+                "PurchaseManager"
+              ],
+              "attr": {
+                "Department": "Engineering"
+              }
+            },
+            "bob": {
+              "password": "bob",
+              "roles": [
+                "PurchaseManager"
+              ],
+              "attr": {
+                "Department": "Marketing"
+              }
+            },
+            "carol": {
+              "password": "carol",
+              "roles": [
+                "Viewer"
+              ]
+            },
+            "dave": {
+              "password": "dave",
+              "roles": [
+                "Administrator"
+              ]
+            }
+          }
         }
       }
     }
@@ -31,18 +76,8 @@
   ],
   "sapux": [
     "app/po-management",
-    "app/po-management",
-    "app/po-management",
-    "app/po-management",
-    "app/po-management",
     "app/project1",
     "app/project2",
-    "app/project1",
-    "app/project1",
-    "app/project1",
-    "app/project1",
-    "app/po-management",
-    "app/project1",
     "app/purchase"
   ]
 }
