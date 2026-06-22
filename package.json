@@ -23,57 +23,29 @@
     "requires": {
       "db": {
         "kind": "hana-cloud",
-        "[development]": {
-          "kind": "sql"
-        },
-        "[production]": {
-          "kind": "hana-cloud"
-        }
+        "[development]": { "kind": "sql" },
+        "[production]": { "kind": "hana-cloud" }
       },
       "auth": {
         "kind": "xsuaa",
         "[development]": {
           "kind": "mocked",
           "users": {
-            "alice": {
-              "password": "alice",
-              "roles": [
-                "PurchaseManager"
-              ],
-              "attr": {
-                "Department": "Engineering"
-              }
-            },
-            "bob": {
-              "password": "bob",
-              "roles": [
-                "PurchaseManager"
-              ],
-              "attr": {
-                "Department": "Marketing"
-              }
-            },
-            "carol": {
-              "password": "carol",
-              "roles": [
-                "Viewer"
-              ]
-            },
-            "dave": {
-              "password": "dave",
-              "roles": [
-                "Administrator"
-              ]
-            }
+            "alice":   { "password": "alice",   "roles": ["PurchaseManager"], "attr": { "Department": "Engineering" } },
+            "bob":     { "password": "bob",     "roles": ["PurchaseManager"], "attr": { "Department": "Marketing" } },
+            "carol":   { "password": "carol",   "roles": ["Viewer"] },
+            "dave":    { "password": "dave",    "roles": ["Administrator"] },
+            "viewer":  { "password": "viewer",  "roles": ["Viewer"] },
+            "manager": { "password": "manager", "roles": ["PurchaseManager", "Viewer"] },
+            "admin":   { "password": "admin",   "roles": ["Administrator", "PurchaseManager", "Viewer"] },
+            "*": true
           }
         }
       }
     }
   },
   "private": true,
-  "workspaces": [
-    "app/*"
-  ],
+  "workspaces": [ "app/*" ],
   "sapux": [
     "app/po-management",
     "app/project1",
