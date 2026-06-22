@@ -21,6 +21,18 @@
     {
       "name": "$XSAPPNAME.Admin",
       "description": "Full administrative access"
+    },
+    {
+      "name": "$XSAPPNAME.Viewer",
+      "description": "Viewer"
+    },
+    {
+      "name": "$XSAPPNAME.PurchaseManager",
+      "description": "PurchaseManager"
+    },
+    {
+      "name": "$XSAPPNAME.Administrator",
+      "description": "Administrator"
     }
   ],
   "attributes": [],
