@@ -1,0 +1,2 @@
+sap.ui.define(["sap/fe/test/JourneyRunner","epm/purchase/test/integration/pages/PurchaseOrdersList","epm/purchase/test/integration/pages/PurchaseOrdersObjectPage"],function(e,r,s){"use strict";var t=new e({launchUrl:sap.ui.require.toUrl("epm/purchase")+"/test/flp.html#app-preview",pages:{onThePurchaseOrdersList:r,onThePurchaseOrdersObjectPage:s},async:true});return t});
+//# sourceMappingURL=JourneyRunner.js.map

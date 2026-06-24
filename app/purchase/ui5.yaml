@@ -2,7 +2,7 @@
 
 specVersion: "4.0"
 metadata:
-  name: epm.purchase
+  name: purchase
 type: application
 server:
   customMiddleware:
@@ -25,4 +25,4 @@ server:
       afterMiddleware: fiori-tools-appreload
       configuration:
         flp:
-          theme: sap_horizon_dark
+          theme: sap_horizon

@@ -1,8 +1,85 @@
+// Supplier validation logic
 const cds = require('@sap/cds');
 
 module.exports = function () {
+  const setUIFields = (po) => {
+    if (!po) return;
+
+    switch (po.status) {
+      case 'Draft':
+        po.statusCriticality = 0;
+        po.progressValue = 10;
+        po.submitHidden = false;
+        po.approveHidden = true;
+        po.rejectHidden = true;
+        po.poFieldControl = 7;
+        break;
+
+      case 'Pending':
+        po.statusCriticality = 2;
+        po.progressValue = 50;
+        po.submitHidden = true;
+        po.approveHidden = false;
+        po.rejectHidden = false;
+        po.poFieldControl = 0;
+        break;
+
+      case 'Approved':
+        po.statusCriticality = 3;
+        po.progressValue = 100;
+        po.submitHidden = true;
+        po.approveHidden = true;
+        po.rejectHidden = true;
+        po.poFieldControl = 0 ;
+        break;
+
+      case 'Rejected':
+        po.statusCriticality = 1;
+        po.progressValue = 0;
+        po.submitHidden = true;
+        po.approveHidden = true;
+        po.rejectHidden = true;
+        po.poFieldControl = 0 ;
+        break;
+
+      case 'Received':
+        po.statusCriticality = 3;
+        po.progressValue = 100;
+        po.submitHidden = true;
+        po.approveHidden = true;
+        po.rejectHidden = true;
+        po.poFieldControl = 0 ;
+        break;
+
+      default:
+        po.statusCriticality = 0;
+        po.progressValue = 0;
+        po.submitHidden = true;
+        po.approveHidden = true;
+        po.rejectHidden = true;
+        po.poFieldControl = 1 ;
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // Validation at draft-save time (before activation)
+  // ---------------------------------------------------------------------
+  this.before('SAVE', 'PurchaseOrders', (req) => {
+    if (!req.data.poNumber || req.data.poNumber.trim() === '') {
+      req.error(400, 'PO Number is required');
+    }
+    if (!req.data.supplier_ID) {
+      req.error(400, 'Supplier is required');
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------
 
   this.on('submit', 'PurchaseOrders', async (req) => {
+    console.log("TARGET =", req.target.name);
+
     const { ID } = req.params[0];
 
     const po = await SELECT.one.from('com.epm.PurchaseOrders').where({ ID });
@@ -93,7 +170,7 @@ module.exports = function () {
       .set({ status: 'Rejected' })
       .where({ ID });
 
-    await this.emit('POrejected', {
+    await this.emit('PORejected', {
       poId: ID,
       poNumber: po.poNumber,
       rejectedBy: req.user.id,
@@ -108,7 +185,7 @@ module.exports = function () {
 
   this.on('receive', 'PurchaseOrders', async (req) => {
     const { ID } = req.params[0];
-    const { notes } = req.data;
+    const { receivedQty, notes } = req.data;
 
     const po = await SELECT.one.from('com.epm.PurchaseOrders').where({ ID });
     if (!po) req.reject(404, 'Purchase Order not found');
@@ -129,8 +206,12 @@ module.exports = function () {
         .where({ ID: item.product_ID });
 
       if (product) {
+        // Use receivedQty if provided (e.g. partial receipt against this item),
+        // otherwise fall back to the full ordered quantity for this item.
+        const qtyToAdd = (receivedQty != null) ? receivedQty : item.quantity;
+
         await UPDATE('com.epm.Products')
-          .set({ stock: product.stock + item.quantity })
+          .set({ stock: product.stock + qtyToAdd })
           .where({ ID: item.product_ID });
       }
     }
@@ -157,13 +238,11 @@ module.exports = function () {
     const today = new Date();
     const daysOpen = Math.floor((today - createdDate) / (1000 * 60 * 60 * 24));
 
-    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-
     return {
       poNumber: po.poNumber,
       supplier: supplier?.name || 'Unknown',
       itemCount: items.length,
-      totalAmount: +totalAmount.toFixed(2),
+      totalAmount: +(po.totalAmount || 0).toFixed(2),
       status: po.status,
       daysOpen
     };
@@ -177,13 +256,17 @@ module.exports = function () {
       draftCount: allPOs.filter(p => p.status === 'Draft').length,
       pendingApproval: allPOs.filter(p => p.status === 'Submitted').length,
       approvedCount: allPOs.filter(p => p.status === 'Approved').length,
+      rejectedpoCount: allPOs.filter(p => p.status === 'Rejected').length,
       totalSpend: +allPOs
         .filter(p => ['Approved', 'Received'].includes(p.status))
         .reduce((sum, p) => sum + (p.totalAmount || 0), 0)
-        .toFixed(2),
-      rejectedpoCount: allPOs.filter(p => p.status === 'Rejected').length
+        .toFixed(2)
     };
   });
+
+  // ---------------------------------------------------------------------
+  // Event log handlers
+  // ---------------------------------------------------------------------
 
   this.on('POSubmitted', (msg) => {
     const { poNumber, supplierName, totalAmount, submittedBy } = msg.data;
@@ -195,42 +278,55 @@ module.exports = function () {
     console.log(`PO APPROVED: ${poNumber}, By: ${approvedBy}, Comment: ${comment}`);
   });
 
-  this.on('POrejected', (msg) => {
+  this.on('PORejected', (msg) => {
     const { poNumber, rejectedBy, reason } = msg.data;
     console.log(`PO REJECTED: ${poNumber}, By: ${rejectedBy}, Reason: ${reason}`);
   });
+
+  // ---------------------------------------------------------------------
+  // READ: compute criticality + action-availability flags
+  // ---------------------------------------------------------------------
   this.after('READ', 'PurchaseOrders', (data) => {
 
-  const records = Array.isArray(data) ? data : [data];
+    const records = Array.isArray(data) ? data : [data];
 
-  records.forEach(po => {
+    records.forEach(po => {
 
-    switch (po.status) {
+      switch (po.status) {
+        case 'Approved':
+        case 'Received':
+          po.criticality = 3; // Green
+          break;
 
-      case 'Approved':
-      case 'Received':
-        po.criticality = 3; // Green
-        break;
+        case 'Submitted':
+          po.criticality = 2; // Orange
+          break;
 
-      case 'Submitted':
-      case 'Draft':
-        po.criticality = 2; // Orange
-        break;
+        case 'Draft':
+          po.criticality = 5; // Blue (Information)
+          break;
 
-      case 'Rejected':
-        po.criticality = 1; // Red
-        break;
+        case 'Rejected':
+          po.criticality = 1; // Red
+          break;
 
-      case 'Created':
-        po.criticality = 5; // Blue (Information)
-        break;
+        default:
+          po.criticality = 0;
+      }
 
-      default:
-        po.criticality = 0;
-    }
+      // Action availability flags (used with @Core.OperationAvailable)
+      po.submitEnabled  = po.status === 'Draft';
+      po.approveEnabled = po.status === 'Submitted';
+      po.rejectEnabled  = po.status === 'Submitted';
+      po.receiveEnabled = po.status === 'Approved';
+      if(po.status === 'Draft') {
+        po.poNumberEditable = 7; // editable
+        po.supplierEditable = 7;
+      } else {
+        po.poNumberEditable = 1; // read-only
+        po.supplierEditable = 1;
+      }
+    });
 
   });
-  
-
-});
 };
